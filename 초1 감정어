@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>알록달록 마음 사전</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        /* 플래시카드 뒤집기 애니메이션 */
+        .card {
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .card-face-back {
+            transform: rotateY(180deg);
+        }
+    </style>
+</head>
+<body class="bg-yellow-50 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="app" class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg p-6">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-yellow-500">🌈 알록달록 마음 사전</h1>
+            <p class="text-gray-500 mt-1">오늘은 어떤 마음을 배웠을까?</p>
+        </header>
+
+        <!-- 진행 상황 표시 -->
+        <div id="progress-container" class="mb-6">
+            <p class="text-lg font-semibold text-center text-gray-700">오늘의 학습進度</p>
+            <div class="w-full bg-gray-200 rounded-full h-4 mt-2">
+                <div id="progress-bar" class="bg-green-400 h-4 rounded-full transition-all duration-500" style="width: 0%;"></div>
+            </div>
+            <p id="progress-text" class="text-center text-sm text-gray-500 mt-1">0 / 0</p>
+        </div>
+
+        <!-- 학습 선택 메뉴 -->
+        <nav id="menu" class="flex justify-around mb-6">
+            <button data-mode="flashcard" class="menu-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">플래시카드</button>
+            <button data-mode="quiz" class="menu-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">마음 퀴즈</button>
+            <button data-mode="sentence" class="menu-btn bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">문장 완성</button>
+        </nav>
+
+        <!-- 학습 콘텐츠 영역 -->
+        <main id="content-area" class="min-h-[300px] flex items-center justify-center">
+            <!-- 초기 화면 -->
+            <div id="welcome-screen" class="text-center">
+                <p class="text-xl font-semibold text-gray-600">무엇을 먼저 배워볼까요?</p>
+                <p class="text-gray-500 mt-2">위 버튼을 눌러 학습을 시작하세요!</p>
+            </div>
+            <!-- 플래시카드 -->
+            <div id="flashcard-container" class="hidden w-full perspective-[1000px]"></div>
+            <!-- 퀴즈 -->
+            <div id="quiz-container" class="hidden w-full"></div>
+            <!-- 문장 완성 -->
+            <div id="sentence-container" class="hidden w-full"></div>
+        </main>
+
+        <!-- 네비게이션 버튼 -->
+        <div id="navigation-controls" class="flex justify-between mt-6 hidden">
+            <button id="prev-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition">이전</button>
+            <button id="next-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">다음</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 데이터 영역 ---
+            // 초등학교 1학년 수준의 감정 어휘 목록 (총 28개, 4주 분량)
+            const ALL_WORDS = [
+                { word: '기쁨', definition: '매우 좋고 즐거운 마음이나 느낌', sentence: '선물을 받아서 [ ]이 넘쳤어요.' },
+                { word: '슬픔', definition: '마음이 아프고 괴로운 느낌', sentence: '친구가 이사를 가서 [ ]에 잠겼어요.' },
+                { word: '화남', definition: '몹시 못마땅하거나 언짢은 감정', sentence: '동생이 내 장난감을 망가뜨려서 [ ]이 났어요.' },
+                { word: '행복', definition: '생활에서 충분한 만족과 기쁨을 느끼는 상태', sentence: '가족과 함께 있을 때 가장 [ ]해요.' },
+                { word: '무서움', definition: '위험을 느끼거나 겁이 나는 느낌', sentence: '어두운 밤 혼자 있으면 [ ]을 느껴요.' },
+                { word: '놀람', definition: '예상하지 못한 일을 당해 가슴이 뛰는 느낌', sentence: '갑자기 친구가 나타나서 깜짝 [ ]했어요.' },
+                { word: '신남', definition: '흥분되고 기분이 좋은 상태', sentence: '소풍 가는 날이라 무척 [ ]이 났어요.' },
+                
+                { word: '사랑', definition: '어떤 사람이나 존재를 아끼고 소중히 여기는 마음', sentence: '나는 우리 엄마 아빠를 [ ]해요.' },
+                { word: '미움', definition: '어떤 것을 싫어하고 밉게 여기는 감정', sentence: '거짓말하는 친구에게 [ ]이 생겼어요.' },
+                { word: '걱정', definition: '일이 잘못될까 봐 불안하고 초조한 마음', sentence: '시험을 잘 못 볼까 봐 [ ]이 돼요.' },
+                { word: '편안함', definition: '몸이나 마음이 아무 걱정 없이 좋은 상태', sentence: '집에 오면 마음이 [ ]을 느껴요.' },
+                { word: '부끄러움', definition: '잘못하거나 창피해서 얼굴을 들기 어려운 느낌', sentence: '많은 사람 앞에서 노래를 부르려니 [ ]이 많았어요.' },
+                { word: '궁금함', definition: '알고 싶거나 보고 싶어서 마음이 끌리는 느낌', sentence: '상자 안에 무엇이 들었을지 [ ]이 생겼어요.' },
+                { word: '외로움', definition: '혼자 있는 것 같아 쓸쓸한 마음', sentence: '아무도 같이 놀아주지 않아서 [ ]을 느꼈어요.' },
+
+                { word: '자랑스러움', definition: '자신이나 다른 사람의 좋은 점을 뽐내고 싶은 마음', sentence: '달리기에서 1등을 해서 [ ]을 느꼈어요.' },
+                { word: '고마움', definition: '다른 사람이 베푼 도움에 대해 감사하게 여기는 마음', sentence: '친구가 나를 도와줘서 [ ]을 표현했어요.' },
+                { word: '실망', definition: '기대했던 일이 이루어지지 않아 마음이 상하는 것', sentence: '갖고 싶던 선물을 못 받아서 [ ]했어요.' },
+                { word: '답답함', definition: '일이 뜻대로 되지 않아 마음이 시원하지 않은 느낌', sentence: '문제가 풀리지 않아서 마음이 [ ]을 느꼈어요.' },
+                { word: '심심함', definition: '할 일이 없어서 지루하고 재미없는 느낌', sentence: '주말에 아무 약속이 없어서 [ ]을 느꼈어요.' },
+                { word: '설렘', definition: '좋은 일이 생길 것 같아 마음이 들뜨는 기분', sentence: '내일 생일이라 마음에 [ ]이 가득해요.' },
+                { word: '뿌듯함', definition: '어려운 일을 해냈을 때 느끼는 만족스러운 기분', sentence: '방 청소를 다 끝내고 나니 [ ]을 느꼈어요.' },
+
+                { word: '안심', definition: '걱정이 사라지고 마음이 놓이는 상태', sentence: '잃어버린 강아지를 찾아서 [ ]이 되었어요.' },
+                { word: '억울함', definition: '아무 잘못 없이 꾸중을 들어 느끼는 답답한 마음', sentence: '내가 하지 않은 일로 혼나서 [ ]을 느꼈어요.' },
+                { word: '감동', definition: '크게 마음이 움직여서 느끼는 벅찬 기분', sentence: '친구의 편지를 읽고 큰 [ ]을 받았어요.' },
+                { word: '질투', definition: '다른 사람이 나보다 잘되는 것을 부러워하고 미워하는 마음', sentence: '친구가 새 장난감을 받아서 [ ]가 났어요.' },
+                { word: '즐거움', definition: '유쾌하고 기쁜 마음이나 느낌', sentence: '친구들과 함께 노는 것은 큰 [ ]이에요.' },
+                { word: '당황', definition: '뜻밖의 일을 만나 어쩔 줄 모르는 상태', sentence: '길을 잃어버려서 무척 [ ]했어요.' },
+                { word: '흐뭇함', definition: '마음에 들어 만족스러운 기분', sentence: '동생이 착한 일을 하는 것을 보니 마음이 [ ]했어요.' },
+            ];
+            const WORDS_PER_WEEK = 7;
+
+            // --- 상태 관리 ---
+            let currentMode = ''; // 'flashcard', 'quiz', 'sentence'
+            let weeklyWords = [];
+            let currentIndex = 0;
+            let progress = {}; // { '기쁨': true, '슬픔': false, ... }
+
+            // --- 헬퍼 함수 ---
+            // 올해의 몇 번째 주인지 계산 (월요일 기준)
+            const getWeekNumber = () => {
+                const today = new Date();
+                const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+                const pastDaysOfYear = (today - firstDayOfYear) / 86400000;
+                return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+            };
+
+            // 오늘 날짜를 'YYYY-MM-DD' 형식으로 가져오기
+            const getTodayDateString = () => {
+                return new Date().toISOString().split('T')[0];
+            };
+
+            // --- 데이터 로딩 및 저장 ---
+            // 로컬 스토리지에서 진행 상황 불러오기
+            const loadProgress = () => {
+                const today = getTodayDateString();
+                const savedProgress = JSON.parse(localStorage.getItem('emotionVocabProgress'));
+                if (savedProgress && savedProgress[today]) {
+                    progress = savedProgress[today];
+                } else {
+                    // 오늘 처음 접속했으면 초기화
+                    weeklyWords.forEach(wordObj => {
+                        progress[wordObj.word] = false;
+                    });
+                }
+            };
+
+            // 로컬 스토리지에 진행 상황 저장하기
+            const saveProgress = () => {
+                const today = getTodayDateString();
+                let savedProgress = JSON.parse(localStorage.getItem('emotionVocabProgress')) || {};
+                savedProgress[today] = progress;
+                localStorage.setItem('emotionVocabProgress', JSON.stringify(savedProgress));
+                updateProgressView();
+            };
+
+            // --- UI 렌더링 함수 ---
+            // 진행 상황 UI 업데이트
+            const updateProgressView = () => {
+                const learnedCount = Object.values(progress).filter(Boolean).length;
+                const totalCount = weeklyWords.length;
+                const progressBar = document.getElementById('progress-bar');
+                const progressText = document.getElementById('progress-text');
+
+                if (totalCount > 0) {
+                    const percentage = (learnedCount / totalCount) * 100;
+                    progressBar.style.width = `${percentage}%`;
+                    progressText.textContent = `${learnedCount} / ${totalCount}`;
+                }
+            };
+
+            // 플래시카드 렌더링
+            const renderFlashcard = () => {
+                const wordObj = weeklyWords[currentIndex];
+                const container = document.getElementById('flashcard-container');
+                container.innerHTML = `
+                    <div class="card w-full h-72 cursor-pointer" onclick="this.classList.toggle('is-flipped')">
+                        <div class="card-face absolute w-full h-full flex items-center justify-center bg-blue-300 rounded-xl shadow-lg">
+                            <p class="text-5xl font-bold text-white">${wordObj.word}</p>
+                        </div>
+                        <div class="card-face card-face-back absolute w-full h-full flex flex-col items-center justify-center bg-blue-500 rounded-xl shadow-lg p-4">
+                            <p class="text-2xl font-bold text-white">${wordObj.definition}</p>
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <button id="mark-learned-btn" class="py-2 px-4 rounded-lg text-white font-semibold ${progress[wordObj.word] ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}">
+                            ${progress[wordObj.word] ? '다 아는 단어예요' : '이제 알았어요!'}
+                        </button>
+                    </div>
+                `;
+                document.getElementById('mark-learned-btn').addEventListener('click', (e) => {
+                    e.stopPropagation(); // 카드가 뒤집히지 않도록
+                    if (!progress[wordObj.word]) {
+                        progress[wordObj.word] = true;
+                        saveProgress();
+                        renderFlashcard(); // 버튼 상태 업데이트를 위해 다시 렌더링
+                    }
+                });
+            };
+
+            // 퀴즈 렌더링
+            const renderQuiz = () => {
+                const wordObj = weeklyWords[currentIndex];
+                const container = document.getElementById('quiz-container');
+
+                // 오답 선택지 만들기
+                let options = [wordObj];
+                while (options.length < 4) {
+                    const randomWord = weeklyWords[Math.floor(Math.random() * weeklyWords.length)];
+                    if (!options.some(opt => opt.word === randomWord.word)) {
+                        options.push(randomWord);
+                    }
+                }
+                // 선택지 섞기
+                options.sort(() => Math.random() - 0.5);
+
+                container.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-4xl font-bold text-purple-600 mb-6">${wordObj.word}</p>
+                        <p class="text-lg text-gray-600 mb-6">이 단어의 뜻은 무엇일까요?</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            ${options.map(opt => `
+                                <button class="quiz-option p-4 bg-purple-100 rounded-lg text-purple-800 hover:bg-purple-200 transition" data-word="${opt.word}">
+                                    ${opt.definition}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.querySelectorAll('.quiz-option').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const isCorrect = button.dataset.word === wordObj.word;
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = `mt-4 p-3 rounded-lg text-center font-bold text-white ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`;
+                        resultDiv.textContent = isCorrect ? '정답이에요! 🎉' : '아쉬워요, 다시 생각해봐요!';
+                        container.appendChild(resultDiv);
+
+                        if (isCorrect) {
+                            progress[wordObj.word] = true;
+                            saveProgress();
+                        }
+                        // 1.5초 후 다음 문제로 (또는 결과 메시지 숨기기)
+                        setTimeout(() => {
+                            if (isCorrect) {
+                                goToNext();
+                            } else {
+                                resultDiv.remove();
+                            }
+                        }, 1500);
+                    });
+                });
+            };
+
+            // 문장 완성 렌더링
+            const renderSentenceGame = () => {
+                const wordObj = weeklyWords[currentIndex];
+                const container = document.getElementById('sentence-container');
+
+                let options = [wordObj];
+                while (options.length < 4) {
+                    const randomWord = weeklyWords[Math.floor(Math.random() * weeklyWords.length)];
+                    if (!options.some(opt => opt.word === randomWord.word)) {
+                        options.push(randomWord);
+                    }
+                }
+                options.sort(() => Math.random() - 0.5);
+
+                const sentenceHtml = wordObj.sentence.replace('[ ]', '<span class="inline-block w-24 h-8 bg-pink-200 rounded-md"></span>');
+
+                container.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-2xl font-semibold text-gray-700 mb-6 leading-relaxed">${sentenceHtml}</p>
+                        <p class="text-lg text-gray-600 mb-6">빈칸에 들어갈 알맞은 말은 무엇일까요?</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            ${options.map(opt => `
+                                <button class="sentence-option p-4 bg-pink-100 rounded-lg text-pink-800 hover:bg-pink-200 transition" data-word="${opt.word}">
+                                    ${opt.word}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.querySelectorAll('.sentence-option').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const isCorrect = button.dataset.word === wordObj.word;
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = `mt-4 p-3 rounded-lg text-center font-bold text-white ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`;
+                        resultDiv.textContent = isCorrect ? '참 잘했어요! 🌟' : '조금 더 생각해볼까요?';
+                        container.appendChild(resultDiv);
+
+                        if (isCorrect) {
+                            progress[wordObj.word] = true;
+                            saveProgress();
+                        }
+                        setTimeout(() => {
+                            if (isCorrect) {
+                                goToNext();
+                            } else {
+                                resultDiv.remove();
+                            }
+                        }, 1500);
+                    });
+                });
+            };
+
+            // --- 화면 전환 및 제어 ---
+            const switchMode = (mode) => {
+                currentMode = mode;
+                currentIndex = 0;
+
+                // 모든 화면 숨기기
+                document.getElementById('welcome-screen').classList.add('hidden');
+                document.getElementById('flashcard-container').classList.add('hidden');
+                document.getElementById('quiz-container').classList.add('hidden');
+                document.getElementById('sentence-container').classList.add('hidden');
+                
+                // 네비게이션 버튼 표시
+                document.getElementById('navigation-controls').classList.remove('hidden');
+
+                renderContent();
+            };
+
+            const renderContent = () => {
+                if (currentMode === 'flashcard') {
+                    document.getElementById('flashcard-container').classList.remove('hidden');
+                    renderFlashcard();
+                } else if (currentMode === 'quiz') {
+                    document.getElementById('quiz-container').classList.remove('hidden');
+                    renderQuiz();
+                } else if (currentMode === 'sentence') {
+                    document.getElementById('sentence-container').classList.remove('hidden');
+                    renderSentenceGame();
+                }
+                updateNavButtons();
+            };
+
+            const updateNavButtons = () => {
+                document.getElementById('prev-btn').disabled = currentIndex === 0;
+                document.getElementById('next-btn').disabled = currentIndex === weeklyWords.length - 1;
+            };
+
+            const goToPrev = () => {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    renderContent();
+                }
+            };
+
+            const goToNext = () => {
+                if (currentIndex < weeklyWords.length - 1) {
+                    currentIndex++;
+                    renderContent();
+                } else {
+                    // 마지막 단어 학습 완료
+                    const contentArea = document.getElementById('content-area');
+                    contentArea.innerHTML = `
+                        <div class="text-center p-8 bg-green-100 rounded-xl">
+                            <h2 class="text-2xl font-bold text-green-700">참 잘했어요!</h2>
+                            <p class="mt-2 text-gray-600">이번 주 단어 학습을 모두 마쳤어요!</p>
+                            <p class="mt-1 text-gray-600">다른 학습도 해보세요.</p>
+                        </div>
+                    `;
+                    document.getElementById('navigation-controls').classList.add('hidden');
+                }
+            };
+
+            // --- 초기화 및 이벤트 리스너 ---
+            const init = () => {
+                const week = getWeekNumber();
+                // 매주 다른 단어 세트를 보여주기 위해 주차를 기준으로 단어 목록을 자름
+                const startIndex = ((week - 1) * WORDS_PER_WEEK) % ALL_WORDS.length;
+                
+                // 단어 목록이 순환되도록 처리
+                let tempWords = [];
+                for(let i = 0; i < WORDS_PER_WEEK; i++) {
+                    tempWords.push(ALL_WORDS[(startIndex + i) % ALL_WORDS.length]);
+                }
+                weeklyWords = tempWords;
+
+                loadProgress();
+                updateProgressView();
+
+                // 메뉴 버튼 이벤트 리스너
+                document.querySelectorAll('.menu-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        switchMode(e.target.dataset.mode);
+                    });
+                });
+
+                // 네비게이션 버튼 이벤트 리스너
+                document.getElementById('prev-btn').addEventListener('click', goToPrev);
+                document.getElementById('next-btn').addEventListener('click', goToNext);
+            };
+
+            // 앱 시작
+            init();
+        });
+    </script>
+</body>
+</html>
